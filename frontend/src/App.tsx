@@ -12,7 +12,7 @@ import {
 import { SwarmMessage } from './services/types';
 import { sendSwarmChat, submitHitlApproval } from './services/api';
 import { DataVisualizer } from './components/DataVisualizer';
-import { ApprovalModal } from './components/ApprovalModal';
+import { ApprovalCard } from './components/ApprovalCard';
 
 export const App: React.FC = () => {
   const [messages, setMessages] = useState<SwarmMessage[]>([
@@ -27,13 +27,6 @@ export const App: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string>(() => `session_${Math.random().toString(36).substring(2, 9)}`);
-
-  // Human-in-the-Loop Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{
-    actionType?: string;
-    actionPayload?: Record<string, any>;
-  } | null>(null);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -57,15 +50,6 @@ export const App: React.FC = () => {
 
       // Save updated thread ID
       setThreadId(response.thread_id);
-
-      // Check if paused at Human-in-the-Loop breakpoint!
-      if (response.status === 'AWAITING_APPROVAL') {
-        setPendingAction({
-          actionType: response.action_type,
-          actionPayload: response.action_payload
-        });
-        setIsModalOpen(true);
-      }
 
       const agentMessage: SwarmMessage = {
         id: `agent_${Date.now()}`,
@@ -97,7 +81,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleApproveAction = async (modifiedPayload?: Record<string, any>) => {
+  const handleApproveAction = async (msgId: string, modifiedPayload?: Record<string, any>) => {
     setIsLoading(true);
     try {
       const response = await submitHitlApproval({
@@ -106,20 +90,20 @@ export const App: React.FC = () => {
         modified_payload: modifiedPayload
       });
 
-      setIsModalOpen(false);
-      setPendingAction(null);
-
-      const resolvedMessage: SwarmMessage = {
-        id: `agent_${Date.now()}`,
-        sender: 'agent',
-        text: response.response_text || 'Action successfully executed with human sign-off.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'COMPLETED',
-        actionExecutionResult: response.action_execution_result,
-        currentAgent: 'execute_action_tool'
-      };
-
-      setMessages((prev) => [...prev, resolvedMessage]);
+      // Update message to remove awaiting status and append execution result
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === msgId
+            ? {
+                ...msg,
+                status: 'COMPLETED',
+                text: response.response_text || 'Action authorized and executed.',
+                actionExecutionResult: response.action_execution_result,
+                currentAgent: 'execute_action_tool'
+              }
+            : msg
+        )
+      );
     } catch (err: any) {
       alert(`Approval submission failed: ${err.message}`);
     } finally {
@@ -127,7 +111,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRejectAction = async () => {
+  const handleRejectAction = async (msgId: string) => {
     setIsLoading(true);
     try {
       const response = await submitHitlApproval({
@@ -135,19 +119,18 @@ export const App: React.FC = () => {
         approved: false
       });
 
-      setIsModalOpen(false);
-      setPendingAction(null);
-
-      const rejectedMessage: SwarmMessage = {
-        id: `agent_${Date.now()}`,
-        sender: 'agent',
-        text: response.response_text || 'Action cancelled by human operator.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: 'COMPLETED',
-        currentAgent: 'human_supervisor'
-      };
-
-      setMessages((prev) => [...prev, rejectedMessage]);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === msgId
+            ? {
+                ...msg,
+                status: 'COMPLETED',
+                text: response.response_text || 'Action cancelled by human operator.',
+                currentAgent: 'human_supervisor'
+              }
+            : msg
+        )
+      );
     } catch (err: any) {
       alert(`Rejection failed: ${err.message}`);
     } finally {
@@ -266,6 +249,17 @@ export const App: React.FC = () => {
                 {/* Relational SQL & Table Visualizer */}
                 <DataVisualizer sqlQuery={msg.sqlQuery} data={msg.rawQueryData} />
 
+                {/* Human-in-the-Loop Pop-up Approval Card */}
+                {msg.status === 'AWAITING_APPROVAL' && msg.actionPayload && (
+                  <ApprovalCard
+                    actionType={msg.actionType}
+                    actionPayload={msg.actionPayload}
+                    onApprove={(modified) => handleApproveAction(msg.id, modified)}
+                    onReject={() => handleRejectAction(msg.id)}
+                    isLoading={isLoading}
+                  />
+                )}
+
                 {/* Timestamp */}
                 <div className="message-time">
                   {msg.timestamp}
@@ -303,16 +297,6 @@ export const App: React.FC = () => {
           </form>
         </div>
       </main>
-
-      {/* Human-in-the-Loop Modal */}
-      <ApprovalModal
-        isOpen={isModalOpen}
-        actionType={pendingAction?.actionType}
-        actionPayload={pendingAction?.actionPayload}
-        onApprove={handleApproveAction}
-        onReject={handleRejectAction}
-        isLoading={isLoading}
-      />
     </div>
   );
 };
