@@ -8,7 +8,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 45000,
+  timeout: 120000, // 2 minutes to accommodate multi-agent reflection loops
 });
 
 export const sendSwarmChat = async (query: string, threadId?: string): Promise<SwarmApiResponse> => {
