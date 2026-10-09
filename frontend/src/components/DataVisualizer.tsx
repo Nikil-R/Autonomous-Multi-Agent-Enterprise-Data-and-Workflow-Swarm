@@ -12,15 +12,15 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ sqlQuery, data }
   const columns = data && data.length > 0 ? Object.keys(data[0]) : [];
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 my-3 space-y-3 text-slate-100 shadow-md">
+    <div className="data-visualizer">
       {/* SQL Query Section */}
       {sqlQuery && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
-            <Database className="w-3.5 h-3.5" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="sql-badge-header">
+            <Database style={{ width: 14, height: 14 }} />
             <span>EXECUTED & VERIFIED SQL QUERY</span>
           </div>
-          <pre className="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-300 overflow-x-auto border border-emerald-950">
+          <pre className="sql-code-block">
             {sqlQuery}
           </pre>
         </div>
@@ -28,34 +28,34 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ sqlQuery, data }
 
       {/* Relational Data Table Preview */}
       {data && data.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <Table className="w-3.5 h-3.5 text-blue-400" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="table-header-row">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Table style={{ width: 14, height: 14, color: '#60a5fa' }} />
               <span>QUERY RESULTS ({data.length} ROWS)</span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-500">
-              <Hash className="w-3 h-3" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#64748b' }}>
+              <Hash style={{ width: 12, height: 12 }} />
               <span>Read-Only Verified</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto max-h-56 rounded-lg border border-slate-800">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-950 sticky top-0 border-b border-slate-800">
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
                 <tr>
                   {columns.map((col) => (
-                    <th key={col} className="p-2.5 font-medium text-slate-300 capitalize">
+                    <th key={col}>
                       {col.replace(/_/g, ' ')}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850">
+              <tbody>
                 {data.map((row, rIdx) => (
-                  <tr key={rIdx} className="hover:bg-slate-850 transition-colors">
+                  <tr key={rIdx}>
                     {columns.map((col) => (
-                      <td key={col} className="p-2.5 text-slate-200">
+                      <td key={col}>
                         {typeof row[col] === 'number'
                           ? row[col].toLocaleString()
                           : String(row[col] ?? '')}

@@ -35,18 +35,18 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden text-slate-100">
+    <div className="modal-backdrop">
+      <div className="modal-dialog">
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-950/60 to-slate-900 border-b border-amber-500/30 p-5 flex items-start gap-4">
-          <div className="p-2.5 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-400">
-            <ShieldAlert className="w-6 h-6" />
+        <div className="modal-header">
+          <div className="modal-header-icon">
+            <ShieldAlert style={{ width: 22, height: 22 }} />
           </div>
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-amber-200 flex items-center gap-2">
+          <div>
+            <h3 className="modal-title">
               Human-in-the-Loop Authorization Required
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="modal-subtitle">
               The autonomous swarm proposed an operational action ({actionType}).
               Enterprise compliance requires manual review before execution.
             </p>
@@ -54,16 +54,14 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Proposed Action Parameters
-            </span>
+        <div className="modal-body">
+          <div className="modal-actions-bar">
+            <span>PROPOSED ACTION PARAMETERS</span>
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors"
+              className="edit-btn"
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Edit3 style={{ width: 14, height: 14 }} />
               <span>{isEditing ? 'Cancel Edit' : 'Edit Payload'}</span>
             </button>
           </div>
@@ -72,14 +70,14 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
             <textarea
               value={editedPayloadJson}
               onChange={(e) => setEditedPayloadJson(e.target.value)}
-              className="w-full h-44 bg-slate-950 border border-slate-700 rounded-xl p-3 font-mono text-xs text-emerald-400 focus:outline-none focus:border-amber-500/80 resize-none"
+              className="payload-editor"
             />
           ) : (
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2 text-xs font-mono text-slate-300">
+            <div className="payload-preview">
               {Object.entries(actionPayload).map(([key, value]) => (
-                <div key={key} className="flex gap-2">
-                  <span className="text-slate-500 font-semibold">{key}:</span>
-                  <span className="text-amber-300 font-medium">
+                <div key={key} className="payload-row">
+                  <span className="payload-key">{key}:</span>
+                  <span className="payload-value">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                   </span>
                 </div>
@@ -89,22 +87,22 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-slate-950 border-t border-slate-800 p-4 px-6 flex justify-end gap-3">
+        <div className="modal-footer">
           <button
             onClick={onReject}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all disabled:opacity-50"
+            className="btn-reject"
           >
-            <XCircle className="w-4 h-4 text-rose-400" />
+            <XCircle style={{ width: 16, height: 16, color: '#f43f5e' }} />
             <span>Reject & Cancel</span>
           </button>
 
           <button
             onClick={handleApprove}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+            className="btn-approve"
           >
-            <CheckCircle className="w-4 h-4" />
+            <CheckCircle style={{ width: 16, height: 16 }} />
             <span>{isLoading ? 'Authorizing...' : 'Approve & Execute'}</span>
           </button>
         </div>
