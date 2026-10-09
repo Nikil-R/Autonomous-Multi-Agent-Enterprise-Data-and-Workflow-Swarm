@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import {
-  Send,
-  Bot,
-  User,
+  ArrowRight,
+  Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Sparkles,
-  ShieldCheck,
-  Cpu,
-  Layers,
-  Database
+  RotateCcw
 } from 'lucide-react';
 import { SwarmMessage } from './services/types';
 import { sendSwarmChat, submitHitlApproval } from './services/api';
@@ -15,31 +13,60 @@ import { MarkdownPreview } from './components/MarkdownPreview';
 import { DataVisualizer } from './components/DataVisualizer';
 import { ApprovalCard } from './components/ApprovalCard';
 
+interface QueryTemplate {
+  title: string;
+  summary: string;
+  prompt: string;
+}
+
+const TEMPLATES: QueryTemplate[] = [
+  {
+    title: "Department Salary Breakdown",
+    summary: "Executes aggregate SQL calculating average compensation across all corporate departments.",
+    prompt: "What is the average salary of employees in each department?"
+  },
+  {
+    title: "High-Value Active Accounts",
+    summary: "Filters customer records with active contracts exceeding $5,000 in monthly recurring spend.",
+    prompt: "Which customers have an active plan and spend over $5,000 monthly?"
+  },
+  {
+    title: "Operational Ticket Escalation",
+    summary: "Drafts a high-priority incident and pauses execution for human authorization.",
+    prompt: "Create a HIGH priority support ticket for customer #3: Webhook HMAC signature failure."
+  },
+  {
+    title: "Top Payment Settlements",
+    summary: "Queries the transactions ledger to inspect the top 5 highest payment volumes and payment gateways.",
+    prompt: "Show me the top 5 highest payment transactions and payment methods."
+  }
+];
+
 export const App: React.FC = () => {
   const [messages, setMessages] = useState<SwarmMessage[]>([
     {
       id: 'welcome',
       sender: 'agent',
-      text: "👋 Welcome to **EnterpriseIQ**! I am your Autonomous Enterprise Colleague.\n\nYou can ask me natural language questions about internal data (employees, salaries, customers, transactions, tickets) or ask me to draft operational support tickets and escalation alerts.",
+      text: "Enterprise workspace initialized. Query structured database tables (employees, salaries, customers, transactions, tickets) or execute verified administrative workflows.",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       currentAgent: 'supervisor'
     }
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string>(() => `session_${Math.random().toString(36).substring(2, 9)}`);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [threadId, setThreadId] = useState<string>(() => `sess_${Math.random().toString(36).substring(2, 8)}`);
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim() || isLoading) return;
+  const handleSendMessage = async (customText?: string) => {
+    const textToSend = (customText || inputText).trim();
+    if (!textToSend || isLoading) return;
 
-    const userQuery = inputText.trim();
     setInputText('');
 
     const userMessage: SwarmMessage = {
       id: `user_${Date.now()}`,
       sender: 'user',
-      text: userQuery,
+      text: textToSend,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -47,15 +74,13 @@ export const App: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await sendSwarmChat(userQuery, threadId);
-
-      // Save updated thread ID
+      const response = await sendSwarmChat(textToSend, threadId);
       setThreadId(response.thread_id);
 
       const agentMessage: SwarmMessage = {
         id: `agent_${Date.now()}`,
         sender: 'agent',
-        text: response.response_text || 'Workflow executed.',
+        text: response.response_text || 'Completed.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         intentCategory: response.intent_category,
         status: response.status,
@@ -72,7 +97,7 @@ export const App: React.FC = () => {
       const errorMessage: SwarmMessage = {
         id: `err_${Date.now()}`,
         sender: 'agent',
-        text: `⚠️ **Error connecting to Swarm:** ${err.response?.data?.detail || err.message}`,
+        text: `Connection failed: ${err.response?.data?.detail || err.message}`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'ERROR'
       };
@@ -80,6 +105,25 @@ export const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSendMessage();
+  };
+
+  const handleNewSession = () => {
+    const newId = `sess_${Math.random().toString(36).substring(2, 8)}`;
+    setThreadId(newId);
+    setMessages([
+      {
+        id: `welcome_${Date.now()}`,
+        sender: 'agent',
+        text: "New workspace session started. How can I assist you with enterprise data or workflows?",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        currentAgent: 'supervisor'
+      }
+    ]);
   };
 
   const handleApproveAction = async (msgId: string, modifiedPayload?: Record<string, any>) => {
@@ -91,22 +135,21 @@ export const App: React.FC = () => {
         modified_payload: modifiedPayload
       });
 
-      // Update message to remove awaiting status and append execution result
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === msgId
             ? {
                 ...msg,
                 status: 'COMPLETED',
-                text: response.response_text || 'Action authorized and executed.',
+                text: response.response_text || 'Action approved and executed.',
                 actionExecutionResult: response.action_execution_result,
-                currentAgent: 'execute_action_tool'
+                currentAgent: 'workflow_engine'
               }
             : msg
         )
       );
     } catch (err: any) {
-      alert(`Approval submission failed: ${err.message}`);
+      alert(`Approval failed: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -126,8 +169,8 @@ export const App: React.FC = () => {
             ? {
                 ...msg,
                 status: 'COMPLETED',
-                text: response.response_text || 'Action cancelled by human operator.',
-                currentAgent: 'human_supervisor'
+                text: response.response_text || 'Action cancelled by operator.',
+                currentAgent: 'operator'
               }
             : msg
         )
@@ -139,116 +182,188 @@ export const App: React.FC = () => {
     }
   };
 
-  const quickPrompts = [
-    "What is the average salary of employees in each department?",
-    "Which customers have an active plan and spend over $5,000 monthly?",
-    "Create a HIGH priority support ticket for customer #3: Webhook HMAC signature failure.",
-    "Show me the top 5 highest payment transactions and payment methods."
-  ];
-
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        {/* Brand */}
-        <div className="brand-header">
-          <div className="brand-icon">
-            <Cpu style={{ width: 22, height: 22 }} />
-          </div>
-          <div>
-            <h1 className="brand-title">
-              EnterpriseIQ
-              <span className="brand-version">v1.0</span>
-            </h1>
-            <p className="brand-subtitle">Autonomous Multi-Agent Swarm</p>
-          </div>
-        </div>
+      {/* Collapsible Sidebar */}
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : 'collapsed'}`}>
+        <div className="sidebar-inner">
+          {/* Header */}
+          <div className="sidebar-top">
+            <div className="brand-lockup">
+              <h1 className="brand-title">EnterpriseIQ</h1>
+              <p className="brand-subtitle">Data & Operations Platform</p>
+            </div>
 
-        {/* System Architecture Badges */}
-        <div>
-          <div className="sidebar-section-title">Swarm Architecture</div>
-          <div className="architecture-card">
-            <div className="arch-item">
-              <Layers style={{ width: 15, height: 15, color: '#60a5fa' }} />
-              <span>LangGraph StateGraph</span>
-            </div>
-            <div className="arch-item">
-              <Database style={{ width: 15, height: 15, color: '#34d399' }} />
-              <span>Text-to-SQL + DBA Critic</span>
-            </div>
-            <div className="arch-item">
-              <ShieldCheck style={{ width: 15, height: 15, color: '#fbbf24' }} />
-              <span>Human-in-the-Loop (HITL) Gate</span>
+            <div className="sidebar-action-row">
+              <button
+                type="button"
+                onClick={handleNewSession}
+                className="new-session-button"
+                title="Start a new workspace session"
+              >
+                <Plus style={{ width: 14, height: 14 }} />
+                <span>New Session</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(false)}
+                className="sidebar-collapse-button"
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose style={{ width: 16, height: 16 }} />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Quick Suggestion Prompts */}
-        <div className="sidebar-section-title">Test Scenarios</div>
-        <div className="quick-prompts-list">
-          {quickPrompts.map((prompt, idx) => (
-            <button
-              key={idx}
-              onClick={() => setInputText(prompt)}
-              className="quick-prompt-btn"
-            >
-              "{prompt}"
-            </button>
-          ))}
-        </div>
+          {/* Active Pipeline Nodes */}
+          <div className="sidebar-section">
+            <div className="section-header-row">
+              <span className="section-heading">Active Pipeline</span>
+              <span className="pipeline-state-badge">Ready</span>
+            </div>
 
-        {/* Session ID Footer */}
-        <div className="sidebar-footer">
-          Thread: {threadId}
+            <div className="pipeline-chain">
+              <div className="pipeline-node">
+                <div className="pipeline-dot" />
+                <div className="pipeline-node-info">
+                  <span className="node-title">LangGraph StateGraph</span>
+                  <span className="node-desc">Orchestration & Reflection</span>
+                </div>
+              </div>
+
+              <div className="pipeline-connector" />
+
+              <div className="pipeline-node">
+                <div className="pipeline-dot" />
+                <div className="pipeline-node-info">
+                  <span className="node-title">Text-to-SQL + DBA Critic</span>
+                  <span className="node-desc">Relational Safety Validation</span>
+                </div>
+              </div>
+
+              <div className="pipeline-connector" />
+
+              <div className="pipeline-node">
+                <div className="pipeline-dot navy" />
+                <div className="pipeline-node-info">
+                  <span className="node-title">Human-in-the-Loop</span>
+                  <span className="node-desc">Pre-execution Gate</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar Templates List */}
+          <div className="sidebar-section scrollable">
+            <div className="section-header-row">
+              <span className="section-heading">Verified Templates</span>
+            </div>
+
+            <div className="sidebar-templates-list">
+              {TEMPLATES.map((tmpl, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setInputText(tmpl.prompt)}
+                  className="sidebar-template-card"
+                >
+                  <div className="sidebar-template-header">
+                    <span className="template-title">{tmpl.title}</span>
+                    <ArrowRight style={{ width: 12, height: 12, opacity: 0.4 }} />
+                  </div>
+                  <p className="sidebar-template-desc">{tmpl.summary}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer Persistence Tray */}
+          <div className="sidebar-bottom-tray">
+            <div className="tray-row">
+              <span className="tray-label">Persistence</span>
+              <span className="tray-val">SQLite Checkpointer</span>
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* Main Chat Interface */}
+      {/* Main Chat Workstation */}
       <main className="main-chat-area">
-        {/* Top Navbar */}
+        {/* Navigation Bar */}
         <header className="chat-header">
-          <div className="status-badge">
-            <div className="status-dot" />
-            <span>Swarm Online: Qwen 27B + SQLite Checkpointer</span>
+          <div className="header-left">
+            {!isSidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="sidebar-toggle-button"
+                title="Expand sidebar"
+              >
+                <PanelLeftOpen style={{ width: 16, height: 16 }} />
+                <span>Menu</span>
+              </button>
+            )}
+            <div className="header-status">
+              <span className="status-live-ring" />
+              <span>Operational Engine Live</span>
+            </div>
           </div>
-          <div className="session-badge">
-            Session: {threadId.substring(0, 14)}...
+
+          <div className="header-actions">
+            <span className="header-env-tag">ENTERPRISE CLUSTER</span>
           </div>
         </header>
 
-        {/* Message Feed */}
+        {/* Message Workstation */}
         <div className="messages-container">
+          {/* In-chat Template Explorer Cards (Shows when at beginning of session) */}
+          {messages.length <= 1 && (
+            <div className="chat-templates-banner">
+              <div className="banner-header">
+                <span className="banner-subtitle">Select an automated operational workflow or enter a custom query:</span>
+              </div>
+              <div className="templates-grid">
+                {TEMPLATES.map((tmpl, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleSendMessage(tmpl.prompt)}
+                    className="template-grid-card"
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="card-top">
+                      <span className="card-title">{tmpl.title}</span>
+                      <ArrowRight style={{ width: 14, height: 14, color: '#000080' }} />
+                    </div>
+                    <p className="card-summary">{tmpl.summary}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={`message-row ${msg.sender === 'user' ? 'user' : 'agent'}`}
             >
-              {/* Avatar */}
-              <div className={`avatar ${msg.sender === 'user' ? 'user' : 'agent'}`}>
-                {msg.sender === 'user' ? (
-                  <User style={{ width: 18, height: 18 }} />
-                ) : (
-                  <Bot style={{ width: 18, height: 18 }} />
-                )}
-              </div>
+              <div className="message-bubble">
+                <div className="message-meta-header">
+                  <span className="sender-indicator">
+                    {msg.sender === 'user' ? 'Operator Command' : `Node [${msg.currentAgent || 'Supervisor'}]`}
+                  </span>
+                  <span className="message-time">{msg.timestamp}</span>
+                </div>
 
-              {/* Message Content Bubble */}
-              <div className={`message-bubble ${msg.sender === 'user' ? 'user' : 'agent'}`}>
-                {/* Agent Header Tag */}
-                {msg.sender === 'agent' && msg.currentAgent && (
-                  <div className="agent-tag">
-                    <Sparkles style={{ width: 13, height: 13, color: '#34d399' }} />
-                    <span>Agent Node: [{msg.currentAgent}]</span>
-                  </div>
-                )}
+                <div className="message-content-wrapper">
+                  <MarkdownPreview content={msg.text} />
+                </div>
 
-                {/* Text Content in rich preview */}
-                <MarkdownPreview content={msg.text} />
-
-                {/* Relational SQL & Table Visualizer */}
+                {/* Relational Query Visualizer */}
                 <DataVisualizer sqlQuery={msg.sqlQuery} data={msg.rawQueryData} />
 
-                {/* Human-in-the-Loop Pop-up Approval Card */}
+                {/* Human-in-the-Loop Gate */}
                 {msg.status === 'AWAITING_APPROVAL' && msg.actionPayload && (
                   <ApprovalCard
                     actionType={msg.actionType}
@@ -258,31 +373,26 @@ export const App: React.FC = () => {
                     isLoading={isLoading}
                   />
                 )}
-
-                {/* Timestamp */}
-                <div className="message-time">
-                  {msg.timestamp}
-                </div>
               </div>
             </div>
           ))}
 
           {isLoading && (
-            <div className="loading-indicator">
-              <div className="pulsing-dot" />
-              <span>Swarm collaborating across nodes (Supervisor ➔ Specialist)...</span>
+            <div className="loading-state">
+              <span className="loading-bar" />
+              <span>Synthesizing multi-agent execution cycle...</span>
             </div>
           )}
         </div>
 
-        {/* Chat Input Bar */}
+        {/* Input Bar */}
         <div className="input-container">
-          <form onSubmit={handleSendMessage} className="input-form">
+          <form onSubmit={handleFormSubmit} className="input-form">
             <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask an enterprise question or command an action..."
+              placeholder="Query relational data, generate insights, or dispatch workflow actions..."
               disabled={isLoading}
               className="chat-input"
             />
@@ -291,7 +401,8 @@ export const App: React.FC = () => {
               disabled={isLoading || !inputText.trim()}
               className="send-button"
             >
-              <Send style={{ width: 16, height: 16 }} />
+              <span>Submit</span>
+              <ArrowRight style={{ width: 14, height: 14 }} />
             </button>
           </form>
         </div>
