@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { SwarmMessage } from './services/types';
 import { sendSwarmChat, submitHitlApproval } from './services/api';
+import { MarkdownPreview } from './components/MarkdownPreview';
 import { DataVisualizer } from './components/DataVisualizer';
 import { ApprovalCard } from './components/ApprovalCard';
 
@@ -241,10 +242,8 @@ export const App: React.FC = () => {
                   </div>
                 )}
 
-                {/* Text Content */}
-                <div style={{ whiteSpace: 'pre-wrap' }}>
-                  {msg.text}
-                </div>
+                {/* Text Content in rich preview */}
+                <MarkdownPreview content={msg.text} />
 
                 {/* Relational SQL & Table Visualizer */}
                 <DataVisualizer sqlQuery={msg.sqlQuery} data={msg.rawQueryData} />
